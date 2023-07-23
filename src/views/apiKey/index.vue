@@ -13,7 +13,7 @@
       </template>
       <template v-slot:rowActions="slotProps">
         <el-button icon="el-icon-edit" @click.stop="handleEdit(slotProps.row)">编辑</el-button>
-        <el-button icon="el-icon-delete" disabled @click.stop="handleDelete(slotProps.row)">删除</el-button>
+        <el-button icon="el-icon-delete" @click.stop="handleDelete(slotProps.row)">删除</el-button>
       </template>
       <!-- <template #columns>
         <el-table-column type="selection" width="55" />
@@ -25,6 +25,13 @@
         <el-button style="margin-left: 10px" icon="el-icon-disabled" @click.stop="toggleEnable(slotProps.row)">
           {{ slotProps.row.state == 1 ? '禁用' : '启用' }}
         </el-button>
+      </template>
+
+      <template v-slot:model="props">
+        <template v-for="md in props.row.models">
+          <el-tag :key="md.id" :type="props.row.state === 1 ? 'primary' : 'info'" style="margin: 0 2px;">{{ md.name }}</el-tag>
+        </template>
+        <el-tag v-if="!props.row.models || props.row.models.length === 0" :type="props.row.state === 1 ? 'success' : 'info'">所有模型</el-tag>
       </template>
 
       <template v-slot:billingState="props">
@@ -57,14 +64,14 @@
         </div>
         <div style="margin: 5px 0">
           <el-alert
-            title="账单状态及余额后台每小时更新一次（仅支持OpenAI），如需要立即更新，可以点击编辑后直接保存（然后过10秒钟刷新本页面）"
+            title="账户状态及余额后台每小时更新一次（仅支持OpenAI），如需要立即更新，可以点击编辑后直接保存（然后过10秒钟刷新本页面）"
             type="info"
             :closable="false"
           />
         </div>
         <div style="margin: 5px 0">
           <el-alert
-            title="账单状态异常时，系统不会将此key禁用，需要管理员手动操作"
+            title="账户状态异常时，系统不会将此key禁用，需要管理员手动操作"
             type="info"
             :closable="false"
           />
@@ -76,6 +83,8 @@
     <api-key-edit
       v-if="editShow"
       :api-key="edit"
+      :all-models="allModels"
+      :platforms="platforms"
       @close="handleCloseEditDialog"
       @created="handleCreated"
     />
@@ -86,13 +95,17 @@
 // import { mapGetters } from 'vuex'
 import AiTable from '@/components/Table'
 import ApiKeyEdit from './edit'
-import { getApiKeys, storeApiKey } from '@/api/apiKey.js'
+import { getApiKeys, storeApiKey, deleteApiKey } from '@/api/apiKey.js'
+import { getAiPlatforms } from '@/api/aiPlatform.js'
+import { getAiModels } from '@/api/aiModel.js'
 
 export default {
   name: 'UserIndex',
   components: { AiTable, ApiKeyEdit },
   data() {
     return {
+      platforms: [],
+      allModels: [],
       tableActions: [],
       tableColumns: [{
         label: '#',
@@ -115,11 +128,13 @@ export default {
         width: 80
       }, {
         label: '状态',
-        prop: 'state',
         slot: 'state',
         width: 150
       }, {
-        label: '账单状态',
+        label: '适用模型',
+        slot: 'model'
+      }, {
+        label: '账户状态',
         slot: 'billingState',
         width: 75
       }, {
@@ -136,7 +151,7 @@ export default {
         width: 140
       }],
       tableActionColumn: {
-        width: 260
+        width: 180
       },
       tableData: [],
       pagination: {
@@ -153,6 +168,8 @@ export default {
   },
   mounted() {
     this.reload()
+    this.reloadPlatforms()
+    this.reloadModels()
   },
   methods: {
     reload() {
@@ -166,9 +183,11 @@ export default {
             platformName: key.platformName,
             key: key.key,
             models: key.models,
+            modelIds: key.models.map(m => m.id),
             quota: key.quota,
             callCount: key.callCount,
             state: key.state,
+            remark: key.remark,
             billingState: key.billingState,
             billingUsage: key.billingUsage,
             billingSubs: key.billingSubs,
@@ -180,6 +199,19 @@ export default {
         this.pagination.total = this.tableData.length
       })
     },
+    reloadPlatforms() {
+      getAiPlatforms().then(resp => {
+        this.platforms.splice(0, this.platforms.length)
+        this.platforms.push(... (resp.data || []))
+      })
+    },
+    reloadModels() {
+      getAiModels().then(resp => {
+        const models = resp.data || []
+        this.allModels.splice(0, this.allModels.length)
+        this.allModels.push(...models)
+      })
+    },
     handleRefresh() {
       this.reload()
     },
@@ -187,9 +219,11 @@ export default {
       // this.$message.warning('开发中……')
       this.editShow = true
       this.edit.id = 0
-      this.edit.platformId = 1
+      this.edit.platformId = null
       this.edit.key = null
+      this.edit.modelIds = []
       this.edit.state = null
+      this.edit.remark = null
       this.edit.billingState = null
       this.edit.billingUsage = null
       this.edit.billingSubs = null
@@ -202,7 +236,9 @@ export default {
       this.edit.id = row.id
       this.edit.platformId = row.platformId
       this.edit.key = row.key
+      this.edit.modelIds = row.modelIds
       this.edit.state = row.state
+      this.edit.remark = row.remark
       this.edit.billingState = row.billingState
       this.edit.billingUsage = row.billingUsage
       this.edit.billingSubs = row.billingSubs
@@ -210,7 +246,19 @@ export default {
       this.edit.createTime = row.createTime
     },
     handleDelete(row) {
-      console.log('delete', row)
+      this.$confirm('确定删除' + row.key + '？', '警告', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        customClass: 'long-message',
+        width: '600px',
+        type: 'warning'
+      }).then(async() => {
+        deleteApiKey(row.id).then(resp => {
+          console.log('resp', resp)
+          this.$message.success('操作成功！')
+          this.reload()
+        })
+      })
     },
     toggleEnable(row) {
       // console.log('toggle', row)

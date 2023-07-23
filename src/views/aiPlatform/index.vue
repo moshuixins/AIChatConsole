@@ -9,7 +9,7 @@
       @refresh="handleRefresh"
     >
       <template #topActions>
-        <el-button type="primary" icon="el-icon-plus" disabled @click="handleCreate">新建</el-button>
+        <el-button type="primary" icon="el-icon-plus" @click="handleCreate">新建</el-button>
       </template>
       <template v-slot:rowActions="slotProps">
         <el-button type="primary" plain icon="el-icon-edit" @click.stop="handleShowEdit(slotProps.row)">编辑</el-button>
@@ -50,6 +50,9 @@
           <el-form-item label="BASE_URL">
             <el-input v-model="form.baseUrl" />
           </el-form-item>
+          <el-form-item label="备注">
+            <el-input v-model="form.remark" />
+          </el-form-item>
         </el-form>
       </div>
       <span slot="footer" class="dialog-footer">
@@ -64,7 +67,7 @@
 <script>
 // import { mapGetters } from 'vuex'
 import AiTable from '@/components/Table'
-import { getAiPlatforms, updateAiPlatform } from '@/api/aiPlatform.js'
+import { getAiPlatforms, updateAiPlatform, createAiPlatform } from '@/api/aiPlatform.js'
 
 export default {
   name: 'AiPlatformIndex',
@@ -86,6 +89,9 @@ export default {
         label: '模型总数',
         prop: 'modelsCount',
         width: 75
+      }, {
+        label: '备注',
+        prop: 'remark'
       }, {
         label: '状态',
         prop: 'state',
@@ -110,7 +116,8 @@ export default {
       form: {
         id: null,
         name: null,
-        baseUrl: null
+        baseUrl: null,
+        remark: null
       }
     }
   },
@@ -130,6 +137,7 @@ export default {
             name: platform.name,
             state: platform.state,
             baseUrl: platform.baseUrl,
+            remark: platform.remark,
             modelsCount: platform.modelsCount,
             createTime: platform.createTime
             // updateTime: key.updateTime
@@ -142,7 +150,12 @@ export default {
       this.reload()
     },
     handleCreate() {
-      this.$message.warning('开发中……')
+      this.dialogVisible = true
+      this.form.id = null
+      this.form.name = ''
+      this.form.state = 0
+      this.form.baseUrl = ''
+      this.form.remark = ''
     },
     // handleEdit(row) {
     //   console.log('edit', row)
@@ -156,6 +169,7 @@ export default {
       this.form.name = row.name
       this.form.state = row.state
       this.form.baseUrl = row.baseUrl || ''
+      this.form.remark = row.remark || ''
     },
     handleEditSubmit() {
       if (!this.form.name) {
@@ -169,11 +183,28 @@ export default {
         }
       }
       this.loading = true
+      if (!this.form.id) {
+        createAiPlatform({
+          // id: this.form.id,
+          name: this.form.name,
+          state: this.form.state,
+          baseUrl: this.form.baseUrl,
+          remark: this.form.remark
+        }).then(() => {
+          this.$message.success('操作成功！')
+          this.reload()
+          this.dialogVisible = false
+        }).finally(() => {
+          this.loading = false
+        })
+        return
+      }
       updateAiPlatform({
         id: this.form.id,
         name: this.form.name,
         state: this.form.state,
-        baseUrl: this.form.baseUrl
+        baseUrl: this.form.baseUrl,
+        remark: this.form.remark
       }).then(() => {
         this.$message.success('操作成功！')
         this.reload()
@@ -189,7 +220,8 @@ export default {
         id: row.id,
         name: row.name,
         state: row.state === 1 ? 2 : 1,
-        baseUrl: row.baseUrl
+        baseUrl: row.baseUrl,
+        remark: row.remark
       }).then(() => {
         this.$message.success('操作成功！')
         this.reload()

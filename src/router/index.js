@@ -193,7 +193,7 @@ export const asyncRoutes = [
     path: '/activity',
     component: Layout,
     redirect: '/activity/list',
-    alwaysShow: true, // will always show the root menu
+    alwaysShow: false, // will always show the root menu
     name: 'activity',
     meta: { title: '活动管理', icon: 'dashboard', affix: true },
     children: [
@@ -221,9 +221,54 @@ export const asyncRoutes = [
     ]
   },
   {
+    path: '/order',
+    component: Layout,
+    redirect: '/order/list',
+    alwaysShow: false, // will always show the root menu
+    name: 'order',
+    children: [
+      {
+        path: 'list',
+        component: () => import('@/views/order/index'),
+        name: 'orderList',
+        meta: { title: '订单列表', icon: 'dashboard', affix: true }
+      }
+    ]
+  },
+  {
+    path: '/file',
+    component: Layout,
+    redirect: '/file/list',
+    alwaysShow: false, // will always show the root menu
+    name: 'file',
+    children: [
+      {
+        path: 'list',
+        component: () => import('@/views/file/index'),
+        name: 'fileList',
+        meta: { title: '文件列表', icon: 'dashboard', affix: true }
+      }
+    ]
+  },
+  {
+    path: '/chat',
+    component: Layout,
+    redirect: '/chat/log',
+    alwaysShow: false, // will always show the root menu
+    name: 'chat',
+    children: [
+      {
+        path: 'log',
+        component: () => import('@/views/chat/index'),
+        name: 'chatLog',
+        meta: { title: '聊天记录', icon: 'dashboard', affix: true }
+      }
+    ]
+  },
+  {
     path: '/website',
     component: Layout,
-    alwaysShow: true,
+    alwaysShow: false,
     redirect: '/website/config',
     meta: { title: '配置管理', icon: 'dashboard', affix: true },
     children: [
@@ -231,7 +276,7 @@ export const asyncRoutes = [
         path: '/website/config',
         component: () => import('@/views/website/config/index'),
         name: 'Dashboard',
-        meta: { title: '网站管理', icon: 'dashboard', affix: true }
+        meta: { title: '站点管理', icon: 'dashboard', affix: true }
       }
     ]
   },
